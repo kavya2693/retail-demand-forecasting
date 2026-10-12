@@ -1,0 +1,51 @@
+split  train=777,600  valid=8,400  test=55,200  (test from 2025-11-14)
+
+== OVERALL  (n=55,200) ==
+model                     WMAPE     RMSE     bias
+seasonal-naive           0.2273     7.15   -0.009
+LightGBM no-graph        0.1838     5.46   -0.007
+LightGBM +graph          0.1831     5.45   -0.005
+  -> graph WMAPE lift vs no-graph: +0.4%
+
+== cold item_age<90  (n=8,736) ==
+model                     WMAPE     RMSE     bias
+seasonal-naive           0.2358     6.30   -0.024
+LightGBM no-graph        0.1965     5.01   -0.020
+LightGBM +graph          0.1954     4.99   -0.014
+  -> graph WMAPE lift vs no-graph: +0.5%
+
+== cold item_age<30  (n=3,030) ==
+model                     WMAPE     RMSE     bias
+seasonal-naive           0.2490     5.22   -0.061
+LightGBM no-graph        0.2040     4.26   -0.057
+LightGBM +graph          0.2008     4.22   -0.052
+  -> graph WMAPE lift vs no-graph: +1.6%
+
+== ULTRA-COLD item_age<14 (little/no own history)  (n=1,662) ==
+model                     WMAPE     RMSE     bias
+seasonal-naive           0.2938     4.74   -0.163
+LightGBM no-graph        0.2439     3.97   -0.133
+LightGBM +graph          0.2389     3.95   -0.126
+  -> graph WMAPE lift vs no-graph: +2.1%
+
+== SAFETY STOCK (p90 quantile head) ==
+empirical coverage P(y <= p90) = 0.885   (target 0.90)
+mean order-up-to (p90) = 22.00 units / 7d
+
+top-12 features by gain:
+rmean_7       57525968.0
+rmean_28      11310090.0
+rstd_7         4927518.0
+item_age       2400966.0
+rstd_28         953580.0
+lag_7           660575.0
+promo_flag      385169.0
+lag_1           321145.0
+vendor          163843.0
+brand           142214.0
+temp_z          116602.0
+dow              87084.0
+
+graph-feature share of total gain: 0.3%
+
+SUMMARY: overall lift +0.4% | cold-start lift +2.1% | p90 coverage 0.89
