@@ -1,0 +1,127 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix rd:   <http://example.org/retail-demand#> .
+
+#################################################################
+#  Ontology header
+#################################################################
+<http://example.org/retail-demand>
+    a owl:Ontology ;
+    rdfs:label "RetailCo Retail Demand Ontology" ;
+    rdfs:comment "OWL/RDFS schema for a graph-augmented, store x SKU x day demand-forecasting framework (warehouse-club format, 4,000+ SKUs / 33 stores). Loaded into Neo4j via neosemantics (n10s); graph structure feeds GDS embeddings + graph-derived features into a global LightGBM forecasting head." .
+
+#################################################################
+#  CLASSES  (become node labels in Neo4j)
+#################################################################
+
+rd:Store a owl:Class ; rdfs:label "Store" ;
+    rdfs:comment "A physical warehouse/store location." .
+
+rd:Product a owl:Class ; rdfs:label "Product" ;
+    rdfs:comment "A sellable SKU (item)." .
+
+rd:Category a owl:Class ; rdfs:label "Category" ;
+    rdfs:comment "Merchandise category node; forms a hierarchy via SUBCATEGORY_OF." .
+
+rd:Brand a owl:Class ; rdfs:label "Brand" .
+
+rd:Vendor a owl:Class ; rdfs:label "Vendor" ;
+    rdfs:comment "Supplier of a product; carries replenishment lead time." .
+
+rd:Region a owl:Class ; rdfs:label "Region" ;
+    rdfs:comment "Trade area / climate zone grouping stores." .
+
+rd:Promotion a owl:Class ; rdfs:label "Promotion" ;
+    rdfs:comment "A price/promo event applied to a product at one or more stores over a date window." .
+
+rd:CalendarDay a owl:Class ; rdfs:label "CalendarDay" ;
+    rdfs:comment "A single date; holds holiday/season flags for temporal joins." .
+
+#################################################################
+#  OBJECT PROPERTIES  (become relationship types / edges)
+#################################################################
+
+# --- Hierarchy / attribute edges ---
+rd:IN_CATEGORY a owl:ObjectProperty ; rdfs:label "IN_CATEGORY" ;
+    rdfs:domain rd:Product ; rdfs:range rd:Category .
+
+rd:SUBCATEGORY_OF a owl:ObjectProperty ; rdfs:label "SUBCATEGORY_OF" ;
+    rdfs:domain rd:Category ; rdfs:range rd:Category ;
+    rdfs:comment "Child-to-parent category edge; self-referential hierarchy." .
+
+rd:HAS_BRAND a owl:ObjectProperty ; rdfs:label "HAS_BRAND" ;
+    rdfs:domain rd:Product ; rdfs:range rd:Brand .
+
+rd:SUPPLIED_BY a owl:ObjectProperty ; rdfs:label "SUPPLIED_BY" ;
+    rdfs:domain rd:Product ; rdfs:range rd:Vendor .
+
+rd:LOCATED_IN a owl:ObjectProperty ; rdfs:label "LOCATED_IN" ;
+    rdfs:domain rd:Store ; rdfs:range rd:Region .
+
+# --- Cross-product demand relationships (the graph signal) ---
+rd:SUBSTITUTE_FOR a owl:ObjectProperty , owl:SymmetricProperty ; rdfs:label "SUBSTITUTE_FOR" ;
+    rdfs:domain rd:Product ; rdfs:range rd:Product ;
+    rdfs:comment "Demand transfers between substitutes on promo/stockout (cannibalization). Edge property: strength in [0,1]." .
+
+rd:COMPLEMENT_OF a owl:ObjectProperty , owl:SymmetricProperty ; rdfs:label "COMPLEMENT_OF" ;
+    rdfs:domain rd:Product ; rdfs:range rd:Product ;
+    rdfs:comment "Frequently bought together; promo halo lifts complements. Edge property: strength in [0,1]." .
+
+# --- Cross-store relationships (spatial signal) ---
+rd:SIMILAR_TO a owl:ObjectProperty , owl:SymmetricProperty ; rdfs:label "SIMILAR_TO" ;
+    rdfs:domain rd:Store ; rdfs:range rd:Store ;
+    rdfs:comment "Store-to-store similarity by format/trade-area; peer stores' demand is a feature. Edge property: similarity in [0,1]." .
+
+rd:NEAR a owl:ObjectProperty , owl:SymmetricProperty ; rdfs:label "NEAR" ;
+    rdfs:domain rd:Store ; rdfs:range rd:Store ;
+    rdfs:comment "Geographic proximity; nearby stores drive geographic cannibalization. Edge property: distance_km." .
+
+# --- Promotion wiring ---
+rd:APPLIES_TO a owl:ObjectProperty ; rdfs:label "APPLIES_TO" ;
+    rdfs:domain rd:Promotion ; rdfs:range rd:Product .
+
+rd:AT_STORE a owl:ObjectProperty ; rdfs:label "AT_STORE" ;
+    rdfs:domain rd:Promotion ; rdfs:range rd:Store .
+
+#################################################################
+#  DATA PROPERTIES  (become node properties in Neo4j)
+#################################################################
+
+# Store
+rd:storeId       a owl:DatatypeProperty ; rdfs:domain rd:Store ; rdfs:range xsd:string .
+rd:format        a owl:DatatypeProperty ; rdfs:domain rd:Store ; rdfs:range xsd:string .
+rd:sqft          a owl:DatatypeProperty ; rdfs:domain rd:Store ; rdfs:range xsd:integer .
+rd:latitude      a owl:DatatypeProperty ; rdfs:domain rd:Store ; rdfs:range xsd:double .
+rd:longitude     a owl:DatatypeProperty ; rdfs:domain rd:Store ; rdfs:range xsd:double .
+rd:tradeAreaIncome a owl:DatatypeProperty ; rdfs:domain rd:Store ; rdfs:range xsd:integer .
+rd:openDate      a owl:DatatypeProperty ; rdfs:domain rd:Store ; rdfs:range xsd:date .
+
+# Product
+rd:skuId         a owl:DatatypeProperty ; rdfs:domain rd:Product ; rdfs:range xsd:string .
+rd:productName   a owl:DatatypeProperty ; rdfs:domain rd:Product ; rdfs:range xsd:string .
+rd:basePrice     a owl:DatatypeProperty ; rdfs:domain rd:Product ; rdfs:range xsd:double .
+rd:unitCost      a owl:DatatypeProperty ; rdfs:domain rd:Product ; rdfs:range xsd:double .
+rd:packSize      a owl:DatatypeProperty ; rdfs:domain rd:Product ; rdfs:range xsd:integer .
+rd:perishable    a owl:DatatypeProperty ; rdfs:domain rd:Product ; rdfs:range xsd:boolean .
+rd:privateLabel  a owl:DatatypeProperty ; rdfs:domain rd:Product ; rdfs:range xsd:boolean .
+rd:elasticity    a owl:DatatypeProperty ; rdfs:domain rd:Product ; rdfs:range xsd:double ;
+    rdfs:comment "Own-price elasticity (negative); demand *= (price/basePrice)^elasticity." .
+rd:launchDate    a owl:DatatypeProperty ; rdfs:domain rd:Product ; rdfs:range xsd:date ;
+    rdfs:comment "First-sale date; drives cold-start / item-age features." .
+
+# Vendor
+rd:leadTimeDays  a owl:DatatypeProperty ; rdfs:domain rd:Vendor ; rdfs:range xsd:integer ;
+    rdfs:comment "Replenishment lead time — critical for order-up-to level." .
+
+# Promotion
+rd:promoType     a owl:DatatypeProperty ; rdfs:domain rd:Promotion ; rdfs:range xsd:string .
+rd:discountDepth a owl:DatatypeProperty ; rdfs:domain rd:Promotion ; rdfs:range xsd:double .
+rd:startDate     a owl:DatatypeProperty ; rdfs:domain rd:Promotion ; rdfs:range xsd:date .
+rd:endDate       a owl:DatatypeProperty ; rdfs:domain rd:Promotion ; rdfs:range xsd:date .
+
+# CalendarDay
+rd:date          a owl:DatatypeProperty ; rdfs:domain rd:CalendarDay ; rdfs:range xsd:date .
+rd:isHoliday     a owl:DatatypeProperty ; rdfs:domain rd:CalendarDay ; rdfs:range xsd:boolean .
+rd:season        a owl:DatatypeProperty ; rdfs:domain rd:CalendarDay ; rdfs:range xsd:string .
