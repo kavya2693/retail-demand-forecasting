@@ -1,0 +1,21 @@
+# generated data (regenerate with: python src/generate_data.py)
+data/*.csv
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# secrets / local
+.env
+.env.*
+*.log
+*.db
+.DS_Store
+
+# model binaries
+*.pkl
+*.joblib
+*.txt.model
+!data/.gitkeep

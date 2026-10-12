@@ -1,0 +1,8 @@
+numpy
+pandas
+lightgbm
+networkx
+neo4j
+rdflib
+holidays
+# optional GNN: torch, torch_geometric  |  optional probabilistic: gluonts, darts
